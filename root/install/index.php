@@ -5,7 +5,7 @@
  * @author Sajaki@gmail.com
  * @copyright 2009 bbdkp
  * @license http://opensource.org/licenses/gpl-license.php GNU Public License
- * @version 1.2.8-PL1
+ * @version 1.2.9
  */
  
 define('UMIL_AUTO', true);
@@ -987,8 +987,7 @@ $versions = array(
         
 		// change the class / race table
        'custom' => array( 
-            'tableupdates',
-    		'gameinstall',  
+    		'tableupdates', 'gameinstall'  
          
        ), 
     ), 
@@ -1008,8 +1007,8 @@ $versions = array(
 		),    	
      
      'custom' => array( 
+     		// run game installers
     		'gameinstall',  
-          	'bbdkp_caches', 
     	),
     	    	
      ),
@@ -1017,17 +1016,26 @@ $versions = array(
      '1.2.8-pl1' => array(
      //patch 1, https://github.com/bbDKP/bbDKP/commit/10277b0, no db changes
      
-     		'custom' => array(
-     			'bbdkp_caches',
-     		),
      ),
      '1.2.8-pl2' => array(
      //patch 2, to fix updater bug going from v126 to v128
      
+     ),
+
+     '1.2.9' => array(
+     		
+     		'config_update' => array(
+					// roster layout: main parameter for steering roster layout
+     				array('bbdkp_roster_layout', '0', true),
+     		),
+     		 
      		'custom' => array(
+     			'tableupdates',
+     			'gameinstall',  
      			'bbdkp_caches',
      		),
      ),
+     
 );
 
 // Include the UMIF Auto file and everything else will be handled automatically.
@@ -1054,7 +1062,7 @@ function encode_message($text)
 /******************************
  * 
  *  gametable installer
- *  at each bbdkp verionupdate this function is updated for latest specs. 
+ *  at each bbdkp versionupdate this function is updated for latest specs. 
  * 
  */
 function gameinstall($action, $version)
@@ -1238,6 +1246,41 @@ function gameinstall($action, $version)
 					}
 					return array('command' => sprintf($user->lang['UMIL_GAME128'], implode(", ", $installed_games)) , 'result' => 'SUCCESS');
 					break;
+					
+				case '1.2.9':
+					//no new games
+					
+					if($config['bbdkp_games_wow'] == 1 || request_var('wow', 0) == 1)
+					{
+						/*check if race_ids are correct*/
+						
+						$sql = "SELECT count(*) as countr24 FROM phpbb_bbdkp_races WHERE race_id=24 AND game_id='wow' ";
+						$result = $db->sql_query($sql);
+						$r24 = (int) $db->sql_fetchfield('countr24');
+						$sql = "SELECT count(*) as countr25 FROM phpbb_bbdkp_races WHERE race_id=25 AND game_id='wow' ";
+						$result = $db->sql_query($sql);
+						$r25 = (int) $db->sql_fetchfield('countr25');
+						$sql = "SELECT count(*) as countr26 FROM phpbb_bbdkp_races WHERE race_id=26 AND game_id='wow' ";
+						$result = $db->sql_query($sql);
+						$r26 = (int) $db->sql_fetchfield('countr26');
+						if($r24 == 1 && $r25 == 1 && $r26 == 0)
+						{
+							/*horde*/
+							$db->sql_query("UPDATE phpbb_bbdkp_races SET race_id=26 WHERE race_id=25 AND game_id='wow'");
+							$db->sql_query("UPDATE phpbb_bbdkp_memberlist SET member_race_id=26 WHERE member_race_id=25 AND game_id='wow'");
+							$db->sql_query("UPDATE phpbb_bbdkp_language SET attribute_id=26 WHERE attribute_id=25 AND game_id='wow'");
+							/*alliance*/
+							$db->sql_query("UPDATE phpbb_bbdkp_memberlist SET member_race_id=25 WHERE member_race_id=24 AND game_id='wow'");
+							$db->sql_query("UPDATE phpbb_bbdkp_races SET race_id=25 WHERE race_id=24 AND game_id='wow'");
+							$db->sql_query("UPDATE phpbb_bbdkp_language SET attribute_id=25 WHERE attribute_id=24 AND game_id='wow'");
+						}
+						$db->sql_freeresult($result);
+						
+					}
+						
+					
+						
+					break;
 			}
 			break;
 		case 'uninstall':
@@ -1262,9 +1305,27 @@ function tableupdates($action, $version)
 				case '1.2.6':
 					break;	
 				case '1.2.7':
-					break;										
+					break;		
+				case '1.2.8':
+					break;
+				case '1.2.9':
+					// add double PK in members table
+					
+					// remove unique index 'member_name' on member table
+					$sql = "ALTER TABLE " . $table_prefix . 'bbdkp_memberlist' . " DROP INDEX member_name";
+					$db->sql_query($sql);
+					
+					// make new unique composite
+					$sql= "CREATE UNIQUE INDEX member_name ON " . $table_prefix . 'bbdkp_memberlist' . " (member_guild_id, member_name) ";
+					$db->sql_query($sql);
+					
+						
+					break;
+					
+													
 			}
 			break;
+			
 		case 'update':
 			switch ($version)
 			{
@@ -1292,7 +1353,20 @@ function tableupdates($action, $version)
 					
 					break;
 				case '1.2.8':
-					break;					
+					break;
+				case '1.2.9':
+					// add double PK in members table
+
+					// remove unique index 'member_name' on member table
+					$sql = "ALTER TABLE " . $table_prefix . 'bbdkp_memberlist' . " DROP INDEX member_name";
+					$db->sql_query($sql);
+						
+					// make new unique composite
+					$sql= "CREATE UNIQUE INDEX member_name ON " . $table_prefix . 'bbdkp_memberlist' . " (member_guild_id, member_name) ";
+					$db->sql_query($sql);
+					
+					break;
+										
 			}
 			break;
 		case 'uninstall' :
@@ -1304,6 +1378,9 @@ function tableupdates($action, $version)
 					break;
 				case '1.2.8':
 					break;	
+				case '1.2.9':
+					break;
+					
 			}
 			break;
 	}
@@ -1405,17 +1482,13 @@ function check_oldbbdkp()
 	// check config		
 	if($umil->config_exists('bbdkp_version'))
     {
-		if(version_compare($config['bbdkp_version'], '1.2.6') == -1 )
+		if(version_compare($config['bbdkp_version'], '1.2.7') == -1 )
 		{
-			//stop here, the version is less than 1.2.6
+			//stop here, the version is less than 1.2.7
 			//redirect(append_sid($phpbb_root_path . '/olddkpupdate/index.'. $phpEx));
-			trigger_error( $user->lang['ERROR_MINIMUM126'], E_USER_WARNING);  
-			
+			trigger_error( $user->lang['UMIL_127MINIMUM'], E_USER_WARNING);  
 		}
-		
-    }   	
-
-	
+    }
 }
 
 
